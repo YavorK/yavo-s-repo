@@ -20,7 +20,6 @@ function convertMsFrameToModel(inputFrame, inputToModelMap, modelArrayLength) {
 }
 
 
-// ELEMENT FROM MicrosoftAPI array goes to ELEMENT POSITION in the modelArray
 
 const data = require('./blendShapes.js');
 
@@ -29,6 +28,7 @@ const msInputFrame = data[0]['BlendShapes'][0];
 console.log(msInputFrame); // [0.171, 0.164, 0.038, ... ]
 
 // todo: maybe have different maps for different models?
+// ELEMENT FROM MicrosoftAPI array goes to ELEMENT POSITION in the modelArray
 const msToModelMap = {
     0 /*eyeBlinkLeft*/: 67,
     1 /*eyeLookDownLeft*/: 40,
