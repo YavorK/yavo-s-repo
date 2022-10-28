@@ -34,8 +34,8 @@ const msToModelMap = {
     1 /*eyeLookDownLeft*/: 40,
     //todo: ...fill in the rest...
 }
-
-const frameForModel = convertMsFrameToModel(msInputFrame, msToModelMap, 72);
+const modelArrayLength = 72;
+const frameForModel = convertMsFrameToModel(msInputFrame, msToModelMap, modelArrayLength);
 console.log('Array for (Meta) model:')
 console.log(frameForModel);
 
