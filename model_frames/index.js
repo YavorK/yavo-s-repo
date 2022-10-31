@@ -38,5 +38,15 @@ const modelArrayLength = 72;
 const frameForModel = convertMsFrameToModel(msInputFrame, msToModelMap, modelArrayLength);
 console.log('Array for (Meta) model:')
 console.log(frameForModel);
-
+// benchmark
+// console.time('modelAllFrames');
+// const modelAllFrames = [];
+// for(const element of data) {
+//     for(const msFrame of element['BlendShapes']){
+//         const modelFrame = convertMsFrameToModel(msFrame, msToModelMap, modelArrayLength)
+//         modelAllFrames.push(modelFrame);
+//     }
+// }
+// console.timeEnd('modelAllFrames')
+// console.log('Model frames produced: '+modelAllFrames.length)
 
