@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>three.js webgl - morph targets - face</title>
+		<meta charset="utf-8" />
+		<meta
+			name="viewport"
+			content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0"
+		/>
+		<link type="text/css" rel="stylesheet" href="main.css" />
+		<style>
+			body {
+				background-color: #666666;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="info">
+			<a href="https://threejs.org" target="_blank" rel="noopener">three.js</a>
+			webgl - morph targets - face<br />
+			model by
+			<a
+				href="https://www.bannaflak.com/face-cap"
+				target="_blank"
+				rel="noopener"
+				>Face Cap</a
+			>
+		</div>
+
+		<!-- Import maps polyfill -->
+		<!-- Remove this when import maps will be widely supported -->
+		<script
+			async
+			src="https://unpkg.com/es-module-shims@1.3.6/dist/es-module-shims.js"
+		></script>
+
+		<script type="importmap">
+			{
+				"imports": {
+					"three": "../build/three.module.js",
+					"three/addons/": "./jsm/"
+				}
+			}
+		</script>
+
+		<script type="module">
+			import * as THREE from "three";
+
+			import Stats from "three/addons/libs/stats.module.js";
+
+			import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+			import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+			import { KTX2Loader } from "three/addons/loaders/KTX2Loader.js";
+			import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
+
+			import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+
+			import { GUI } from "three/addons/libs/lil-gui.module.min.js";
+
+			import blendShapes from "./story/davis-viseme-data.js";
+
+			init();
+
+			//////////////////////////////////////
+			const lastFrame = [
+				0, 0, 0, 0.01, 0.122, 0.163, 0.185, 0, 0, 0.124, 0, 0.121, 0.163, 0.185,
+				0.054, 0.021, 0, 0.19, 0.149, 0.12, 0.083, 0.008, 0.003, 0.006, 0.015,
+				0.02, 0.013, 0.042, 0.039, 0.092, 0.074, 0.059, 0.05, 0.014, 0.075,
+				0.017, 0.018, 0.183, 0.178, 0.015, 0.015, 0.029, 0.029, 0.116, 0, 0,
+				0.016, 0.041, 0.044, 0.029, 0.029, 0, 0.03, 0, -0.002,
+			];
+			//////////////////////////////////////
+
+			function init() {
+				let mixer;
+
+				const clock = new THREE.Clock();
+
+				var flattenedBendShapes = [
+					...blendShapes.map((element) => {
+						let res = element.BlendShapes.map((frameValues) =>
+							frameValues.slice(0, -3)
+						);
+						return res.flat();
+					}),
+				].flat();
+
+				// flattenedBendShapes are all the frames values (17680; we have 52 values per frame; 17680 / 52 = 340 frames)
+				console.log("flattenedBendShapes: ", flattenedBendShapes);
+
+				const container = document.createElement("div");
+				document.body.appendChild(container);
+
+				const camera = new THREE.PerspectiveCamera(
+					45,
+					window.innerWidth / window.innerHeight,
+					1,
+					20
+				);
+				camera.position.set(-1.8, 1.8, 13);
+
+				// create an AudioListener and add it to the camera
+				const listener = new THREE.AudioListener();
+				camera.add(listener);
+
+				// create a global audio source
+				const sound = new THREE.Audio(listener);
+
+				// load a sound and set it as the Audio object's buffer
+				const audioLoader = new THREE.AudioLoader();
+				audioLoader.load("./story/asset1.wav", function (buffer) {
+					sound.setBuffer(buffer);
+					sound.setLoop(true);
+					sound.setVolume(0.5);
+					sound.play();
+				});
+
+				const scene = new THREE.Scene();
+
+				const renderer = new THREE.WebGLRenderer({ antialias: true });
+				renderer.setPixelRatio(window.devicePixelRatio);
+				renderer.setSize(window.innerWidth, window.innerHeight);
+
+				renderer.toneMapping = THREE.ACESFilmicToneMapping;
+				renderer.outputEncoding = THREE.sRGBEncoding;
+
+				container.appendChild(renderer.domElement);
+
+				const ktx2Loader = new KTX2Loader()
+					.setTranscoderPath("js/libs/basis/")
+					.detectSupport(renderer);
+
+				new GLTFLoader()
+					.setKTX2Loader(ktx2Loader)
+					.setMeshoptDecoder(MeshoptDecoder)
+					.load("models/gltf/testModel01.glb", (gltf) => {
+						const mesh = gltf.scene;
+
+						mesh.position.y = -1;
+						mesh.position.z = 1;
+
+						scene.add(mesh);
+
+						let frames = [];
+						let framesLenght = 1789;
+
+						//Set times per frame 60fps, not sure whether should be 1/60 - 1 frame is 0.0166 seconds or in miliseconds
+						var times = [...Array(framesLenght).keys()].map(
+							(x) => x * (1 / 60)
+						);
+
+						// Calculate clipLenght Manually due to performance issues frames.length / 60
+
+						// Numbered KeyframeTrack use single dimensional array
+						var newTrack = new THREE.NumberKeyframeTrack(
+							"Wolf3D_Head.morphTargetInfluences",
+							times,
+							flattenedBendShapes
+						);
+						var newTrack2 = new THREE.NumberKeyframeTrack(
+							"Wolf3D_Teeth.morphTargetInfluences",
+							times,
+							flattenedBendShapes
+						);
+						var newTrack3 = new THREE.NumberKeyframeTrack(
+							"EyeLeft.morphTargetInfluences",
+							times,
+							flattenedBendShapes
+						);
+						var newTrack4 = new THREE.NumberKeyframeTrack(
+							"EyeRight.morphTargetInfluences",
+							times,
+							flattenedBendShapes
+						);
+
+						var newClip = new THREE.AnimationClip(
+							"Clip",
+							framesLenght / 60,
+							[newTrack, newTrack2, newTrack3, newTrack4],
+							2500
+						);
+
+						gltf.animations.push(newClip);
+
+						mixer = new THREE.AnimationMixer(mesh);
+
+						let action = mixer.clipAction(newClip);
+
+						action.play();
+
+						const teeth = mesh.getObjectByName("Wolf3D_Teeth");
+						const head = mesh.getObjectByName("Wolf3D_Head");
+
+						teeth.morphTargetInfluences = lastFrame;
+						head.morphTargetInfluences = lastFrame;
+
+						const influences = head.morphTargetInfluences;
+
+						const gui = new GUI();
+						gui.close();
+
+						console.log(head.morphTargetDictionary);
+
+						for (const [key, value] of Object.entries(
+							head.morphTargetDictionary
+						)) {
+							console.log("key ", key, " value ", value);
+							gui
+								.add(influences, value, 0, 1, 0.01)
+								.name(key.replace("blendShape1.", ""))
+								.listen(influences);
+						}
+					});
+
+				const environment = new RoomEnvironment();
+				const pmremGenerator = new THREE.PMREMGenerator(renderer);
+
+				scene.background = new THREE.Color(0x666666);
+				scene.environment = pmremGenerator.fromScene(environment).texture;
+
+				const controls = new OrbitControls(camera, renderer.domElement);
+				controls.enableDamping = true;
+				controls.minDistance = 0.5;
+				controls.maxDistance = 5;
+				controls.minAzimuthAngle = -Math.PI / 2;
+				controls.maxAzimuthAngle = Math.PI / 2;
+				controls.maxPolarAngle = Math.PI / 1.8;
+				controls.target.set(0, 0.15, -0.2);
+
+				const stats = new Stats();
+
+				container.appendChild(stats.dom);
+
+				renderer.setAnimationLoop(() => {
+					const delta = clock.getDelta();
+
+					if (mixer) {
+						mixer.update(delta);
+					}
+
+					renderer.render(scene, camera);
+
+					controls.update();
+
+					stats.update();
+				});
+
+				window.addEventListener("resize", () => {
+					camera.aspect = window.innerWidth / window.innerHeight;
+					camera.updateProjectionMatrix();
+
+					renderer.setSize(window.innerWidth, window.innerHeight);
+				});
+			}
+		</script>
+	</body>
+</html>

@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>three.js webgl - morph targets - face</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <link type="text/css" rel="stylesheet" href="main.css">
+    <style>
+        body {
+            background-color: #666666;
+        }
+    </style>
+</head>
+<body>
+
+<div id="info">
+    <a href="https://threejs.org" target="_blank" rel="noopener">three.js</a> webgl - morph targets - face<br/>
+    model by <a href="https://www.bannaflak.com/face-cap" target="_blank" rel="noopener">Face Cap</a>
+</div>
+
+<!-- Import maps polyfill -->
+<!-- Remove this when import maps will be widely supported -->
+<script async src="https://unpkg.com/es-module-shims@1.3.6/dist/es-module-shims.js"></script>
+
+<script type="importmap">
+			{
+				"imports": {
+					"three": "../build/three.module.js",
+					"three/addons/": "./jsm/"
+				}
+			}
+		</script>
+
+<script type="module">
+
+    import * as THREE from 'three';
+
+    import Stats from 'three/addons/libs/stats.module.js';
+
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
+    import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+
+    import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+    import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
+
+    import blendShapes from './story/blendShapes.js';
+
+    init();
+
+    function init() {
+        let mixer;
+
+        const clock = new THREE.Clock();
+
+        var flattenedBendShapes = [...blendShapes.map(index => {
+            let res = index.BlendShapes.map(i => i.slice(0,-3))
+            // console.log(res)
+            return res.flat();
+        })].flat();
+
+        console.log(flattenedBendShapes)
+        const container = document.createElement( 'div' );
+        document.body.appendChild( container );
+
+        const camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 1, 20 );
+        camera.position.set( - 1.8, 1.8, 13 );
+
+        // create an AudioListener and add it to the camera
+        const listener = new THREE.AudioListener();
+        camera.add( listener );
+
+        // create a global audio source
+        const sound = new THREE.Audio( listener );
+
+        // load a sound and set it as the Audio object's buffer
+        const audioLoader = new THREE.AudioLoader();
+        audioLoader.load( './story/asset1.wav', function( buffer ) {
+            sound.setBuffer( buffer );
+            sound.setLoop( true );
+            sound.setVolume( 0.5 );
+            sound.play();
+        });
+
+
+        const scene = new THREE.Scene();
+
+        const renderer = new THREE.WebGLRenderer( { antialias: true } );
+        renderer.setPixelRatio( window.devicePixelRatio );
+        renderer.setSize( window.innerWidth, window.innerHeight );
+
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.outputEncoding = THREE.sRGBEncoding;
+
+        container.appendChild( renderer.domElement );
+
+        const ktx2Loader = new KTX2Loader()
+            .setTranscoderPath( 'js/libs/basis/' )
+            .detectSupport( renderer );
+
+        new GLTFLoader()
+            .setKTX2Loader( ktx2Loader )
+            .setMeshoptDecoder( MeshoptDecoder )
+            // .load( 'models/gltf/facecap.glb', ( gltf ) => {
+            .load( 'models/gltf/edited-keys-avatar-eyes-teeth-02.glb', ( gltf ) => {
+
+                console.log('gltf ', gltf.scene)
+                console.log('gltf children', gltf.scene.children)
+
+                const mesh = gltf.scene;
+                // mesh.scale.set(0, 1, 0)
+                mesh.position.y = -1;
+                mesh.position.z = 1;
+                const teeth = mesh.getObjectByName( 'Wolf3D_Teeth' );
+                teeth.position.y = 0;
+                scene.add( mesh );
+
+
+                let frames = []
+                let framesLenght = 340
+
+
+                //Set times per frame 60fps, not sure whether should be 1/60 - 1 frame is 0.0166 seconds or in miliseconds
+                var times = [...Array(340).keys()].map(x => x*(1/60));
+                console.log('Times ', times)
+
+                // Calculate clipLenght Manually due to performance issues frames.length / 60
+
+
+                // Numbered KeyframeTrack use single dimensional array
+                var newTrack = new THREE.NumberKeyframeTrack('Wolf3D_Head.morphTargetInfluences', times, flattenedBendShapes);
+                var newTrack2 = new THREE.NumberKeyframeTrack('Wolf3D_Teeth.morphTargetInfluences', times, flattenedBendShapes);
+                var newTrack3 = new THREE.NumberKeyframeTrack('EyeLeft.morphTargetInfluences', times, flattenedBendShapes);
+                var newTrack4 = new THREE.NumberKeyframeTrack('EyeRight.morphTargetInfluences', times, flattenedBendShapes);
+
+                var newClip = new THREE.AnimationClip('Clip', 340/60, [newTrack, newTrack2], 2500);
+
+                mixer = new THREE.AnimationMixer( mesh );
+                console.log('gltf.animations ', gltf.animations);
+                gltf.animations.push(newClip);
+                // mixer.clipAction( gltf.animations[ 0 ] ).play();
+                // mixer.clipAction( gltf.animations[0] ).play();
+                let action = mixer.clipAction(newClip);
+
+                console.log(action);
+
+                action.play();
+
+                console.log('Animation Clip', gltf.animations)
+
+                // console.log("Animation Mixer", mixer.clipAction( newClip ));
+                // GUI
+
+                const head = mesh.getObjectByName( 'Wolf3D_Head' );
+                // teeth.morphTargetInfluences[17] = 0.5;
+// 						head.morphTargetDictionary = {
+// "eyeBlink_L": 0,
+// "eyeLookDown_L": 1  ,
+// "eyeLookIn_L": 2  ,
+// "eyeLookOut_L": 3  ,
+// "eyeLookUp_L": 4  ,
+// "eyeSquint_L": 5  ,
+// "eyeWide_L": 6  ,
+// "eyeBlink_R": 7  ,
+// "eyeLookDown_R": 8  ,
+// "eyeLookIn_R": 9  ,
+// "eyeLookOut_R": 10  ,
+// "eyeLookUp_R": 11  ,
+// "eyeSquint_R": 12  ,
+// "eyeWide_R": 13  ,
+// "jawForward": 14 ,
+// "jawLeft": 15 ,
+// "jawRight": 16 ,
+// "jawOpen": 17 ,
+// "mouthClose": 18 ,
+// "mouthFunnel": 19 ,
+// "mouthPucker": 20 ,
+// "mouthLeft": 21 ,
+// "mouthRight": 22 ,
+// "mouthSmile_L": 23 ,
+// "mouthSmile_R": 24 ,
+// "mouthFrown_L": 25 ,
+// "mouthFrown_R": 26 ,
+// "mouthDimple_L": 27 ,
+// "mouthDimple_R": 28 ,
+// "mouthStretch_L": 29 ,
+// "mouthStretch_R": 30 ,
+// "mouthRollLower": 31 ,
+// "mouthRollUpper": 32 ,
+// "mouthShrugLower": 33 ,
+// "mouthShrugUpper": 34 ,
+// "mouthPress_L": 35 ,
+// "mouthPress_R": 36 ,
+// "mouthLowerDown_L": 37 ,
+// "mouthLowerDown_R": 38 ,
+// "mouthUpperUp_L": 39 ,
+// "mouthUpperUp_R": 40 ,
+// "browDown_L": 41 ,
+// "browDown_R": 42 ,
+// "browInnerUp": 43 ,
+// "browOuterUp_L": 44 ,
+// "browOuterUp_R": 45 ,
+// "cheekPuff": 46 ,
+// "cheekSquint_L": 47 ,
+// "cheekSquint_R": 48 ,
+// "noseSneer_L": 49 ,
+// "noseSneer_R": 50 ,
+// "tongueOut": 51 ,
+// 						};
+                // head.updateMorphTargets();
+// 						head.morphTargetDictionary = {
+// 							eyeBlinkLeft: 0,
+// eyeLookDownLeft: 1,
+// eyeLookInLeft: 2,
+// eyeLookOutLeft: 3,
+// eyeLookUpLeft: 4,
+// eyeSquintLeft: 5,
+// eyeWideLeft: 6,
+// eyeBlinkRight: 7,
+// eyeLookDownRight: 8,
+// eyeLookInRight: 9,
+// eyeLookOutRight: 10,
+// eyeLookUpRight: 11,
+// eyeSquintRight: 12,
+// eyeWideRight: 13,
+// jawForward: 14,
+// jawLeft: 15,
+// jawRight: 16,
+// jawOpen: 17,
+// mouthClose: 18,
+// mouthFunnel: 19,
+// mouthPucker: 20,
+// mouthLeft: 21,
+// mouthRight: 22,
+// mouthSmileLeft: 23,
+// mouthSmileRight: 24,
+// mouthFrownLeft: 25,
+// mouthFrownRight: 26,
+// mouthDimpleLeft: 27,
+// mouthDimpleRight: 28,
+// mouthStretchLeft: 29,
+// mouthStretchRight: 30,
+// mouthRollLower: 31,
+// mouthRollUpper: 32,
+// mouthShrugLower: 33,
+// mouthShrugUpper: 34,
+// mouthPressLeft: 35,
+// mouthPressRight: 36,
+// mouthLowerDownLeft: 37,
+// mouthLowerDownRight: 38,
+// mouthUpperUpLeft: 39,
+// mouthUpperUpRight: 40,
+// browDownLeft: 41,
+// browDownRight: 42,
+// browInnerUp: 43,
+// browOuterUpLeft: 44,
+// browOuterUpRight: 45,
+// cheekPuff: 46,
+// cheekSquintLeft: 47,
+// cheekSquintRight: 48,
+// noseSneerLeft: 49,
+// noseSneerRight: 50,
+// tongueOut: 51,
+// 						}
+
+                // head.morphTargetInfluences[0] = 1;
+
+
+                const influences = head.morphTargetInfluences;
+                ///
+                const gui = new GUI();
+                gui.close();
+
+                console.log(head.morphTargetDictionary);
+
+                for ( const [ key, value ] of Object.entries( head.morphTargetDictionary ) ) {
+                    console.log("key ", key, " value ", value);
+                    gui.add( influences, value, 0, 1, 0.01 )
+                        .name( key.replace( 'blendShape1.', '' ) )
+                        .listen( influences );
+
+                }
+
+            } );
+
+        const environment = new RoomEnvironment();
+        const pmremGenerator = new THREE.PMREMGenerator( renderer );
+
+        scene.background = new THREE.Color( 0x666666 );
+        scene.environment = pmremGenerator.fromScene( environment ).texture;
+
+        const controls = new OrbitControls( camera, renderer.domElement );
+        console.log("Controls", controls);
+        controls.enableDamping = true;
+        controls.minDistance = 2.5;
+        controls.maxDistance = 5;
+        controls.minAzimuthAngle = - Math.PI / 2;
+        controls.maxAzimuthAngle = Math.PI / 2;
+        controls.maxPolarAngle = Math.PI / 1.8;
+        controls.target.set( 0, 0.15, - 0.2 );
+
+        const stats = new Stats();
+
+        container.appendChild( stats.dom );
+
+        renderer.setAnimationLoop( () => {
+            const delta = clock.getDelta();
+
+            if ( mixer ) {
+
+                mixer.update( delta );
+
+            }
+
+            renderer.render( scene, camera );
+
+            controls.update();
+
+            stats.update();
+
+        } );
+
+        window.addEventListener( 'resize', () => {
+
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+
+            renderer.setSize( window.innerWidth, window.innerHeight );
+
+        } );
+
+    }
+</script>
+</body>
+</html>
